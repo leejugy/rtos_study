@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "cli.h": "c",
+        "ms_work.h": "c"
+    }
+}
