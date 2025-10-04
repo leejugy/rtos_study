@@ -2,7 +2,7 @@
 #define __STATUS_H__
 
 #include "main.h"
-#include "app_freertos.h"
+#include "app_threadx.h"
 
 void status_init();
 
@@ -24,7 +24,7 @@ typedef enum
 
 typedef struct
 {
-    osSemaphoreId_t *sem;
+    TX_SEMAPHORE *sem;
     int status;
 }int_status_t;
 

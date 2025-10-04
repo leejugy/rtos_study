@@ -171,19 +171,25 @@ void tim_pwm_run_led()
     htim8.Instance->CCR4 = val;
     if (!cal)
     {
-      if (val == 0)
-      {
-        cal = true;
-      }
-      val--;
+        if (val <= 1)
+        {
+            cal = true;
+        }
+        else
+        {
+            val -= 1;
+        }
     }
     else
     {
-      if (val == 1000)
-      {
-        cal = false;
-      }
-      val++;
+        if (val >= 1000)
+        {
+            cal = false;
+        }
+        else
+        {
+            val += 1;
+        }
     }
 }
 /* USER CODE END 1 */

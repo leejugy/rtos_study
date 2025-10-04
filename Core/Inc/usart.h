@@ -29,7 +29,7 @@ extern "C" {
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-#include "app_freertos.h"
+#include "app_threadx.h"
 #include "status.h"
 /* USER CODE END Includes */
 
@@ -75,7 +75,7 @@ typedef struct
     uart_tx_t tx;
     UART_MODE tx_mode;
     UART_MODE rx_mode;
-    osSemaphoreId_t *sem;
+    TX_SEMAPHORE *sem;
 }uart_t;
 
 void prints(char *fmt, ...);

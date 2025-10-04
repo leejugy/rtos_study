@@ -21,7 +21,7 @@
 #include "usart.h"
 
 /* USER CODE BEGIN 0 */
-#include "app_freertos.h"
+#include "app_threadx.h"
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;
@@ -167,7 +167,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     }
 
     /* USART1 interrupt Init */
-    HAL_NVIC_SetPriority(USART1_IRQn, 5, 0);
+    HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
   /* USER CODE BEGIN USART1_MspInit 1 */
 
@@ -208,7 +208,7 @@ uart_t uart[UART_IDX_MAX] = {
     [UART1_IDX].handle = &huart1,
     [UART1_IDX].rx_mode = UART_MODE_DMA,
     [UART1_IDX].tx_mode = UART_MODE_POLLING,
-    [UART1_IDX].sem = &uart1_semHandle,
+    [UART1_IDX].sem = &uart1_sem,
 };
 
 static void uart_dma_rx_init(uart_t *ut)

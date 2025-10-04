@@ -17,8 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include "app_threadx.h"
 #include "main.h"
-#include "cmsis_os2.h"
 #include "gpdma.h"
 #include "icache.h"
 #include "tim.h"
@@ -53,7 +53,6 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -101,13 +100,7 @@ int main(void)
   tim_init();
   /* USER CODE END 2 */
 
-  /* Init scheduler */
-  osKernelInitialize();
-  /* Call init function for freertos objects (in app_freertos.c) */
-  MX_FREERTOS_Init();
-
-  /* Start scheduler */
-  osKernelStart();
+  MX_ThreadX_Init();
 
   /* We should never get here as control is now taken by the scheduler */
 

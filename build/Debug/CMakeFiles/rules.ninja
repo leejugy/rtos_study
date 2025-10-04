@@ -35,8 +35,10 @@ rule C_COMPILER__h562_rtos_study_unscanned_Debug
 # Rule for linking C executable.
 
 rule C_EXECUTABLE_LINKER__h562_rtos_study_Debug
-  command = C:\WINDOWS\system32\cmd.exe /C "$PRE_LINK && C:\ST\STM32CubeCLT_1.19.0\GNU-tools-for-STM32\bin\arm-none-eabi-gcc.exe $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD"
+  command = C:\WINDOWS\system32\cmd.exe /C "$PRE_LINK && C:\ST\STM32CubeCLT_1.19.0\GNU-tools-for-STM32\bin\arm-none-eabi-gcc.exe $FLAGS $LINK_FLAGS @$RSP_FILE -o $TARGET_FILE  && $POST_BUILD"
   description = Linking C executable $TARGET_FILE
+  rspfile = $RSP_FILE
+  rspfile_content = $in $LINK_PATH $LINK_LIBRARIES
   restat = $RESTAT
 
 
@@ -59,9 +61,19 @@ rule C_COMPILER__STM32_Drivers_unscanned_Debug
 
 
 #############################################
+# Rule for compiling ASM files.
+
+rule ASM_COMPILER__ThreadX_unscanned_Debug
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}C:\ST\STM32CubeCLT_1.19.0\GNU-tools-for-STM32\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  description = Building ASM object $out
+
+
+#############################################
 # Rule for compiling C files.
 
-rule C_COMPILER__RTOS2_unscanned_Debug
+rule C_COMPILER__ThreadX_unscanned_Debug
   depfile = $DEP_FILE
   deps = gcc
   command = ${LAUNCHER}${CODE_CHECK}C:\ST\STM32CubeCLT_1.19.0\GNU-tools-for-STM32\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
