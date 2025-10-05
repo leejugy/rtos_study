@@ -21,6 +21,7 @@
 #include "main.h"
 #include "gpdma.h"
 #include "icache.h"
+#include "sdmmc.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -95,6 +96,7 @@ int main(void)
   MX_ICACHE_Init();
   MX_USART1_UART_Init();
   MX_TIM8_Init();
+  MX_SDMMC1_SD_Init();
   /* USER CODE BEGIN 2 */
   uart_init();
   tim_init();
