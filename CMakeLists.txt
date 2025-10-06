@@ -48,6 +48,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/cli.c
     Core/Src/status.c
     Core/Src/ms_work.c
+    Core/Src/que_ctl.c
 )
 
 # Add include paths

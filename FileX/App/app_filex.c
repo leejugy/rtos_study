@@ -24,6 +24,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "sdmmc.h"
+#include "usart.h"
+#include "que_ctl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* Main thread stack size */
-#define FX_APP_THREAD_STACK_SIZE         2048
+#define FX_APP_THREAD_STACK_SIZE         4096
 /* Main thread priority */
 #define FX_APP_THREAD_PRIO               10
 /* USER CODE BEGIN PD */
@@ -64,7 +66,212 @@ FX_MEDIA        sdio_disk;
 void fx_app_thread_entry(ULONG thread_input);
 
 /* USER CODE BEGIN PFP */
+static int sd_file_create(sd_req_t *sd_req)
+{
+    UINT sd_status = 0;
 
+    sd_status = fx_file_create(&sdio_disk, sd_req->route);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("fail to create file : %d", sd_status);
+        return -1;
+    }
+
+    sd_status = fx_media_flush(&sdio_disk);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status);
+        return -1;
+    }
+
+    return 1;
+}
+
+static int sd_file_write(sd_req_t *sd_req)
+{
+    UINT sd_status = 0;
+    FX_FILE file = {0, };
+    int ret = 1;
+
+    if (!sd_req->buf)
+    {
+        printr("buf is null");
+        return -1;
+    }
+
+    sd_status = fx_file_open(&sdio_disk, &file, sd_req->route, FX_OPEN_FOR_WRITE);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file open fail : %d", sd_status);
+        return -1;
+    }
+
+    sd_status = fx_file_seek(&file, sd_req->seek);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file seek fail");
+        ret = -1;
+        goto close_out;
+    }
+
+    sd_status = fx_file_write(&file, sd_req->buf, sd_req->buf_size);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file write fail : %d", sd_status);
+        ret = -1;
+        goto close_out;
+    }
+
+close_out:
+    sd_status = fx_file_close(&file);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status);
+        return -1;
+    }
+
+    sd_status = fx_media_flush(&sdio_disk);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status);
+        return -1;
+    }
+
+    return ret;
+}
+
+static int sd_file_read(sd_req_t *sd_req)
+{
+    UINT sd_status = 0;
+    ULONG rd_size = 0;
+    FX_FILE file = {0, };
+    int ret = 1;
+
+    if (!sd_req->buf)
+    {
+        printr("buf is null");
+        ret = -1;
+        goto out;
+    }
+
+    sd_status = fx_file_open(&sdio_disk, &file, sd_req->route, FX_OPEN_FOR_WRITE);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file open fail : %d", sd_status);
+        ret = -1;
+        goto out;
+    }
+
+    sd_status = fx_file_seek(&file, sd_req->seek);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file seek fail");
+        ret = -1;
+        goto close_out;
+    }
+
+    sd_status = fx_file_read(&file, sd_req->buf, sd_req->buf_size, &rd_size);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file read fail : %d", sd_status);
+        ret = -1;
+        goto close_out;
+    }
+    else
+    {
+        ret = rd_size;
+    }
+    
+
+close_out:
+    sd_status = fx_file_close(&file);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status);
+        return -1;
+    }
+out:
+    if (sd_req->rd_size)
+    {
+        *(sd_req->rd_size) = ret;
+    }
+
+    return ret;
+}
+
+static int sd_mkdir(sd_req_t *sd_req)
+{
+    UINT sd_status = 0;
+
+    sd_status = fx_directory_create(&sdio_disk, sd_req->route);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("fail to create directory : %d", sd_status);
+        return -1;
+    }
+
+    sd_status = fx_media_flush(&sdio_disk);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status);
+        return -1;
+    }
+
+    return 1;
+}
+
+static int sd_remove(sd_req_t *sd_req)
+{
+    UINT sd_status1 = 0;
+    UINT sd_status2 = 0;
+
+    sd_status1 = fx_file_delete(&sdio_disk, sd_req->route);
+    if (sd_status1 != FX_SUCCESS)
+    {
+        sd_status2 = fx_directory_delete(&sdio_disk, sd_req->route);
+        if (sd_status2 != FX_SUCCESS)
+        {
+            printr("fail to delete file or directory : %d, %d", sd_status1, sd_status2);
+        }
+    }
+    
+    sd_status1 = fx_media_flush(&sdio_disk);
+    if (sd_status1 != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status1);
+        return -1;
+    }
+
+    return 1;
+}
+
+static void sd_req_proc(sd_req_t *sd_req)
+{
+    switch (sd_req->req)
+    {
+    case SD_WRITE:
+        sd_file_write(sd_req);
+        break;
+    case SD_READ:
+        sd_file_read(sd_req);
+        break;
+    case SD_CREATE:
+        sd_file_create(sd_req);
+        break;
+    case SD_MKDIR:
+        sd_mkdir(sd_req);
+        break;
+    case SD_REMOVE:
+        sd_remove(sd_req);
+        break;
+    }
+
+    if (sd_req->req_end)
+    {
+        *(sd_req->req_end) = true;
+    }
+    memset(sd_req, 0, sizeof(sd_req_t));
+}
 /* USER CODE END PFP */
 
 /**
@@ -128,9 +335,9 @@ UINT MX_FileX_Init(VOID *memory_ptr)
  {
 
   UINT sd_status = FX_SUCCESS;
-    
-/* USER CODE BEGIN fx_app_thread_entry 0*/
 
+/* USER CODE BEGIN fx_app_thread_entry 0*/
+  sd_req_t sd_req = {0, };
 /* USER CODE END fx_app_thread_entry 0*/
 
 /* Open the SD disk driver */
@@ -145,68 +352,13 @@ UINT MX_FileX_Init(VOID *memory_ptr)
   }
 
 /* USER CODE BEGIN fx_app_thread_entry 1*/
-    //todo que(tx_queue_create)를 만들어서 케이스 별로 분기[쓰기/읽기/파일만들기/디렉토리탐색/fat32로 초기화]하여 sdio 관련 동작을 수행.
-    FX_FILE fx_file = {0, };
-    sd_status =  fx_file_create(&sdio_disk, "STM32.TXT");
-
-    /* Check the create sd_status */
-    if (sd_status != FX_SUCCESS)
+    while(1)
     {
-        /* Check for an already created sd_status. This is expected on the
-        second pass of this loop! */
-        if (sd_status != FX_ALREADY_CREATED)
+        if (que_pop(&sd_que, &sd_req, sizeof(sd_req)) > 0)
         {
-        /* Create error, call error handler */
-        Error_Handler();
+            sd_req_proc(&sd_req);
         }
-    }
-
-    /* Open the test file */
-    sd_status =  fx_file_open(&sdio_disk, &fx_file, "STM32.TXT", FX_OPEN_FOR_WRITE);
-
-    /* Check the file open sd_status */
-    if (sd_status != FX_SUCCESS)
-    {
-        /* Error opening file, call error handler */
-        Error_Handler();
-    }
-
-    /* Seek to the beginning of the test file */
-    sd_status =  fx_file_seek(&fx_file, 0);
-
-    /* Check the file seek sd_status */
-    if (sd_status != FX_SUCCESS)
-    {
-        /* Error performing file seek, call error handler */
-        Error_Handler();
-    }
-
-    /* Write a string to the test file */
-    sd_status =  fx_file_write(&fx_file, "hellow world!", strlen("hellow world!"));
-
-    /* Check the file write sd_status */
-    if (sd_status != FX_SUCCESS)
-    {
-        /* Error writing to a file, call error handler */
-        Error_Handler();
-    }
-
-    /* Close the test file */
-    sd_status =  fx_file_close(&fx_file);
-
-    if (sd_status != FX_SUCCESS)
-    {
-        /* Error closing the file, call error handler */
-        Error_Handler();
-    }
-
-    sd_status = fx_media_flush(&sdio_disk);
-
-    /* Check the media flush  status */
-    if (sd_status != FX_SUCCESS)
-    {
-        /* Error closing the file, call error handler */
-        Error_Handler();
+        tx_thread_sleep(1);
     }
 /* USER CODE END fx_app_thread_entry 1*/
   }

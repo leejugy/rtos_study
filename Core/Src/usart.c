@@ -403,6 +403,12 @@ void uart_init()
     {
         __uart_init(&uart[idx]);
     }
+
+    if (tx_semaphore_create(&uart1_sem, "uart1 sem", 1) != TX_SUCCESS)
+    {
+        printfail("init uart1 sem");
+    }
+
     printok("UART init success");
 }
 

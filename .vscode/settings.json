@@ -2,6 +2,11 @@
     "files.associations": {
         "cli.h": "c",
         "ms_work.h": "c",
-        "status.h": "c"
+        "status.h": "c",
+        "app_filex.h": "c",
+        "que_ctl.h": "c",
+        "main.h": "c",
+        "usart.h": "c",
+        "app_threadx.h": "c"
     }
 }

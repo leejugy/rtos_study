@@ -7,6 +7,7 @@
 #define CLI_OPTION_MAX (1 << 6)
 #define CMD_MAX_LEN (1 << 9)
 #define CLI_HISTORY_NUM (1 << 2)
+#define CMD_FILE_TRX_SIZE (1 << 7)
 
 typedef enum
 {
@@ -15,6 +16,11 @@ typedef enum
     CMD_CLEAR,
     CMD_REBOOT,
     CMD_DMESG,
+    CMD_WRITE,
+    CMD_READ,
+    CMD_TOUCH,
+    CMD_MKDIR,
+    CMD_REMOVE,
     CMD_IDX_MAX,
 }CLI_COMMAND_IDX;
 
@@ -88,7 +94,7 @@ typedef struct
 typedef struct __attribute__((__packed__))
 {
     uint8_t get_ret : 1;
-    uint8_t reserved :7;
+    uint8_t reserved : 7;
 }cli_arg_opt_t;
 
 typedef union

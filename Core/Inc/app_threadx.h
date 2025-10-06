@@ -36,6 +36,7 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 extern TX_SEMAPHORE uart1_sem;
+extern TX_SEMAPHORE sd_que_sem;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -67,6 +68,15 @@ static inline int sem_post(TX_SEMAPHORE *sem)
         return -1;
     }
     return tx_semaphore_put(sem);
+}
+
+static inline int sem_wait_isr(TX_SEMAPHORE *sem)
+{
+    if (sem == NULL)
+    {
+        return -1;
+    }
+    return tx_semaphore_get(sem, TX_WAIT_FOREVER);
 }
 
 static inline bool check_expired(uint32_t *old_tick, uint32_t goal_tick)

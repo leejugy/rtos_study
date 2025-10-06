@@ -31,7 +31,7 @@ extern "C" {
 #include "fx_stm32_sd_driver.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "main.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -92,7 +92,28 @@ UINT MX_FileX_Init(VOID *memory_ptr);
 #endif
 
 /* USER CODE BEGIN PD */
+typedef enum{
+    SD_WRITE,
+    SD_READ,
+    SD_CREATE,
+    SD_MKDIR,
+    SD_REMOVE,
+}SD_REQUEST;
+typedef struct
+{
+    char route[256];
+    uint8_t *buf;
+    size_t *rd_size;
+    size_t buf_size;
+    uint32_t seek;
+    SD_REQUEST req;
+    bool *req_end;
+}sd_req_t;
 
+#define sd_req_end_wait(sd_req) while(!(*(((sd_req_t*) sd_req)->req_end))) \
+{                          \
+    tx_thread_relinquish();\
+}
 /* USER CODE END PD */
 
 /* USER CODE BEGIN 1 */

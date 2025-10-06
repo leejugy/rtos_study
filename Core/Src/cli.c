@@ -1,12 +1,19 @@
 #include "cli.h"
 #include "usart.h"
 #include "status.h"
+#include "app_filex.h"
+#include "que_ctl.h"
 
 static CLI_EXEC_RESULT cmd_help(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_echo(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_clear(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_reboot(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_dmesg(cli_data_t *cli_data);
+static CLI_EXEC_RESULT cmd_read(cli_data_t *cli_data);
+static CLI_EXEC_RESULT cmd_write(cli_data_t *cli_data);
+static CLI_EXEC_RESULT cmd_touch(cli_data_t *cli_data);
+static CLI_EXEC_RESULT cmd_mkdir(cli_data_t *cli_data);
+static CLI_EXEC_RESULT cmd_remove(cli_data_t *cli_data);
 
 cli_command_t cli_cmd[CMD_IDX_MAX] = 
 {
@@ -52,6 +59,51 @@ cli_command_t cli_cmd[CMD_IDX_MAX] =
     [CMD_DMESG].func = cmd_dmesg,
     [CMD_DMESG].opt = "",
     [CMD_DMESG].opt_size = 0,
+
+    /* write */
+    [CMD_WRITE].help = \
+    "write      : write file to route 128 bytes from the seek\r\n" \
+    "<use>      : write -r <route> -s <seek> -w <string>\r\n",
+    [CMD_WRITE].name = "write",
+    [CMD_WRITE].func = cmd_write,
+    [CMD_WRITE].opt = "rsw",
+    [CMD_WRITE].opt_size = 3,
+
+    /* read */
+    [CMD_READ].help = \
+    "read       : read file to route 128 bytes from the seek\r\n" \
+    "<use>      : read -r <route> -s <seek>\r\n",
+    [CMD_READ].name = "read",
+    [CMD_READ].func = cmd_read,
+    [CMD_READ].opt = "rs",
+    [CMD_READ].opt_size = 2,
+
+    /* touch */
+    [CMD_TOUCH].help = \
+    "touch      : create file to route\r\n" \
+    "<use>      : touch <route>\r\n",
+    [CMD_TOUCH].name = "touch",
+    [CMD_TOUCH].func = cmd_touch,
+    [CMD_TOUCH].opt = "",
+    [CMD_TOUCH].opt_size = 0,
+
+    /* mkdir */
+    [CMD_MKDIR].help = \
+    "mkdir      : create directory to route\r\n" \
+    "<use>      : mkdir <route>\r\n",
+    [CMD_MKDIR].name = "mkdir",
+    [CMD_MKDIR].func = cmd_mkdir,
+    [CMD_MKDIR].opt = "",
+    [CMD_MKDIR].opt_size = 0,
+
+    /* remove */
+    [CMD_REMOVE].help = \
+    "rm         : remove directory or file\r\n" \
+    "<use>      : rm <route>\r\n",
+    [CMD_REMOVE].name = "rm",
+    [CMD_REMOVE].func = cmd_remove,
+    [CMD_REMOVE].opt = "",
+    [CMD_REMOVE].opt_size = 0,
 };
 
 /**
@@ -103,7 +155,8 @@ static int cli_get_opt(cli_data_t *cli_data, cli_arg_t *cli_arg)
     str = str + opt_len;
     len = strlen(str);
 
-    if((str[idx] == '\'' || str[idx] == '\"') && (cli_arg->quotes == false))
+    cli_arg->quotes = false;
+    if(str[idx] == '\'' || str[idx] == '\"')
     {
         cli_arg->quotes = true;
         str++;
@@ -392,6 +445,192 @@ static CLI_EXEC_RESULT cmd_help(cli_data_t *cli_data)
     }
     prints("===================================================\r\n");
 
+    return EXEC_RESULT_OK;
+}
+
+static CLI_EXEC_RESULT cmd_read(cli_data_t *cli_data)
+{
+    sd_req_t sd_req = {0, };
+    cli_arg_t cli_arg = {0, };
+    int opt_idx = 0;
+    size_t ret_size = 0;
+    bool req_end = false;
+    uint8_t buf[CMD_FILE_TRX_SIZE] = {0, };
+
+    sd_req.buf_size = CMD_FILE_TRX_SIZE;
+    sd_req.buf = buf;
+    sd_req.req_end = &req_end;
+    sd_req.req = SD_READ;
+    sd_req.rd_size = &ret_size;
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_READ].opt[opt_idx++];
+    cli_arg.opt.get_ret = 1;
+    if (cli_get_opt(cli_data, &cli_arg) < 0)
+    {
+        printr("opt not detect : %c", cli_arg.cli_get.opt);
+        return EXEC_RESULT_ERR;
+    }
+    strncpy(sd_req.route, cli_arg.arg, sizeof(sd_req.route));
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_READ].opt[opt_idx++];
+    if (cli_get_opt(cli_data, &cli_arg) < 0)
+    {
+        printr("opt not detect : %c", cli_arg.cli_get.opt);
+        return EXEC_RESULT_ERR;
+    }
+    sd_req.seek = atoi(cli_arg.arg);
+
+    if (que_push(&sd_que, &sd_req, sizeof(sd_req)) < 0)
+    {
+        printr("push fail");
+        return EXEC_RESULT_ERR;
+    }
+
+    sd_req_end_wait(&sd_req);
+    prints("read : %s\r\n", sd_req.buf);
+    prints("rd size : %d\r\n", *sd_req.rd_size);
+    return EXEC_RESULT_OK;
+}
+
+static CLI_EXEC_RESULT cmd_write(cli_data_t *cli_data)
+{
+    sd_req_t sd_req = {0, };
+    cli_arg_t cli_arg = {0, };
+    int opt_idx = 0;
+    bool req_end = false;
+    uint8_t buf[CMD_FILE_TRX_SIZE] = {0, };
+
+    sd_req.buf = buf;
+    sd_req.req_end = &req_end;
+    sd_req.req = SD_WRITE;
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_WRITE].opt[opt_idx++];
+    cli_arg.opt.get_ret = 1;
+    if (cli_get_opt(cli_data, &cli_arg) < 0)
+    {
+        printr("opt not detect : %c", cli_arg.cli_get.opt);
+        return EXEC_RESULT_ERR;
+    }
+    strncpy(sd_req.route, cli_arg.arg, sizeof(sd_req.route));
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_WRITE].opt[opt_idx++];
+    if (cli_get_opt(cli_data, &cli_arg) < 0)
+    {
+        printr("opt not detect : %c", cli_arg.cli_get.opt);
+        return EXEC_RESULT_ERR;
+    }
+    sd_req.seek = atoi(cli_arg.arg);
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_WRITE].opt[opt_idx++];
+    if (cli_get_opt(cli_data, &cli_arg) < 0)
+    {
+        printr("opt not detect : %c", cli_arg.cli_get.opt);
+        return EXEC_RESULT_ERR;
+    }
+    strncpy((char *)sd_req.buf, cli_arg.arg, CMD_FILE_TRX_SIZE);
+    sd_req.buf_size = strlen((char *)sd_req.buf);
+
+    if (que_push(&sd_que, &sd_req, sizeof(sd_req)) < 0)
+    {
+        printr("push fail");
+        return EXEC_RESULT_ERR;
+    }
+
+    sd_req_end_wait(&sd_req);
+    prints("write : %s\r\n", sd_req.buf);
+    return EXEC_RESULT_OK;
+}
+
+static CLI_EXEC_RESULT cmd_touch(cli_data_t *cli_data)
+{
+    sd_req_t sd_req = {0, };
+    cli_arg_t cli_arg = {0, };
+    bool req_end = false;
+
+    sd_req.buf_size = CMD_FILE_TRX_SIZE;
+    sd_req.buf = NULL;
+    sd_req.req_end = &req_end;
+    sd_req.req = SD_CREATE;
+
+    cli_arg.cli_get.num = 0;
+    cli_arg.opt.get_ret = 1;
+    if (cli_get_arg(cli_data, &cli_arg) < 0)
+    {
+        printr("arg not detect");
+        return EXEC_RESULT_ERR;
+    }
+    strncpy(sd_req.route, cli_arg.arg, sizeof(sd_req.route));
+
+    if (que_push(&sd_que, &sd_req, sizeof(sd_req)) < 0)
+    {
+        printr("push fail");
+        return EXEC_RESULT_ERR;
+    }
+
+    sd_req_end_wait(&sd_req);
+    prints("touch : %s\r\n", sd_req.route);
+    return EXEC_RESULT_OK;
+}
+
+static CLI_EXEC_RESULT cmd_mkdir(cli_data_t *cli_data)
+{
+    sd_req_t sd_req = {0, };
+    cli_arg_t cli_arg = {0, };
+    bool req_end = false;
+
+    sd_req.buf_size = CMD_FILE_TRX_SIZE;
+    sd_req.buf = NULL;
+    sd_req.req_end = &req_end;
+    sd_req.req = SD_MKDIR;
+
+    cli_arg.cli_get.num = 0;
+    cli_arg.opt.get_ret = 1;
+    if (cli_get_arg(cli_data, &cli_arg) < 0)
+    {
+        printr("arg not detect");
+        return EXEC_RESULT_ERR;
+    }
+    strncpy(sd_req.route, cli_arg.arg, sizeof(sd_req.route));
+
+    if (que_push(&sd_que, &sd_req, sizeof(sd_req)) < 0)
+    {
+        printr("push fail");
+        return EXEC_RESULT_ERR;
+    }
+
+    sd_req_end_wait(&sd_req);
+    prints("mkdir : %s\r\n", sd_req.route);
+    return EXEC_RESULT_OK;
+}
+
+static CLI_EXEC_RESULT cmd_remove(cli_data_t *cli_data)
+{
+    sd_req_t sd_req = {0, };
+    cli_arg_t cli_arg = {0, };
+    bool req_end = false;
+
+    sd_req.buf_size = CMD_FILE_TRX_SIZE;
+    sd_req.buf = NULL;
+    sd_req.req_end = &req_end;
+    sd_req.req = SD_REMOVE;
+
+    cli_arg.cli_get.num = 0;
+    cli_arg.opt.get_ret = 1;
+    if (cli_get_arg(cli_data, &cli_arg) < 0)
+    {
+        printr("arg not detect");
+        return EXEC_RESULT_ERR;
+    }
+    strncpy(sd_req.route, cli_arg.arg, sizeof(sd_req.route));
+
+    if (que_push(&sd_que, &sd_req, sizeof(sd_req)) < 0)
+    {
+        printr("push fail");
+        return EXEC_RESULT_ERR;
+    }
+
+    sd_req_end_wait(&sd_req);
+    prints("rm : %s\r\n", sd_req.route);
     return EXEC_RESULT_OK;
 }
 

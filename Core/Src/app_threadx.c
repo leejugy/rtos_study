@@ -26,6 +26,7 @@
 #include "usart.h"
 #include "cli.h"
 #include "ms_work.h"
+#include "que_ctl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +48,7 @@
 /* USER CODE BEGIN PV */
 /* cli task */
 TX_SEMAPHORE uart1_sem = {0, };
+TX_SEMAPHORE sd_que_sem = {0, };
 TX_THREAD cli_tcb = {0, };
 ULONG cli_task_buf[1024] = {0, };
 /* ms task */
@@ -87,14 +89,11 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   UINT ret = TX_SUCCESS;
 
   /* USER CODE BEGIN App_ThreadX_MEM_POOL */
+    que_init();
+    uart_init();
   /* USER CODE END App_ThreadX_MEM_POOL */
 
   /* USER CODE BEGIN App_ThreadX_Init */
-    if (tx_semaphore_create(&uart1_sem, "uart1 sem", 1) != TX_SUCCESS)
-    {
-        printfail("init uart1 sem");
-    }
-
     if (tx_thread_create(&cli_tcb, "cli_tcb", 
         cli_thread, (ULONG)NULL, cli_task_buf, sizeof(cli_task_buf), 
         15, 10, 100, TX_AUTO_START) != TX_SUCCESS)
