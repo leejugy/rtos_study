@@ -7,6 +7,9 @@
         "que_ctl.h": "c",
         "main.h": "c",
         "usart.h": "c",
-        "app_threadx.h": "c"
+        "app_threadx.h": "c",
+        "sai.h": "c",
+        "fx_stm32_sd_driver.h": "c",
+        "pcm5102a.h": "c"
     }
 }

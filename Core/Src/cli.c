@@ -3,6 +3,7 @@
 #include "status.h"
 #include "app_filex.h"
 #include "que_ctl.h"
+#include "sai.h"
 
 static CLI_EXEC_RESULT cmd_help(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_echo(cli_data_t *cli_data);
@@ -14,6 +15,7 @@ static CLI_EXEC_RESULT cmd_write(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_touch(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_mkdir(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_remove(cli_data_t *cli_data);
+static CLI_EXEC_RESULT cmd_aplay(cli_data_t *cli_data);
 
 cli_command_t cli_cmd[CMD_IDX_MAX] = 
 {
@@ -104,6 +106,15 @@ cli_command_t cli_cmd[CMD_IDX_MAX] =
     [CMD_REMOVE].func = cmd_remove,
     [CMD_REMOVE].opt = "",
     [CMD_REMOVE].opt_size = 0,
+
+    /* aplay */
+    [CMD_APLAY].help = \
+    "aplay      : play wav file (44100hz, signed 16 only)\r\n" \
+    "<use>      : aplay <route>\r\n",
+    [CMD_APLAY].name = "aplay",
+    [CMD_APLAY].func = cmd_aplay,
+    [CMD_APLAY].opt = "",
+    [CMD_APLAY].opt_size = 0,
 };
 
 /**
@@ -453,7 +464,7 @@ static CLI_EXEC_RESULT cmd_read(cli_data_t *cli_data)
     sd_req_t sd_req = {0, };
     cli_arg_t cli_arg = {0, };
     int opt_idx = 0;
-    size_t ret_size = 0;
+    int ret_size = 0;
     bool req_end = false;
     uint8_t buf[CMD_FILE_TRX_SIZE] = {0, };
 
@@ -631,6 +642,33 @@ static CLI_EXEC_RESULT cmd_remove(cli_data_t *cli_data)
 
     sd_req_end_wait(&sd_req);
     prints("rm : %s\r\n", sd_req.route);
+    return EXEC_RESULT_OK;
+}
+
+static CLI_EXEC_RESULT cmd_aplay(cli_data_t *cli_data)
+{
+    sai_tx_req_t tx_req = {0, };
+    cli_arg_t cli_arg = {0, };
+
+    tx_req.flag = SAI_NEW_MUSIC;
+
+    cli_arg.cli_get.num = 0;
+    cli_arg.opt.get_ret = 1;
+    if (cli_get_arg(cli_data, &cli_arg) < 0)
+    {
+        printr("arg not detect");
+        return EXEC_RESULT_ERR;
+    }
+
+    strcpy(tx_req.route, cli_arg.arg);
+
+    if (que_push(&sai1_tx_que, &tx_req, sizeof(tx_req)) < 0)
+    {
+        printr("fail to push que");
+        return EXEC_RESULT_ERR;
+    }
+
+    prints("play wav file : %s\r\n", cli_arg.arg);
     return EXEC_RESULT_OK;
 }
 

@@ -27,6 +27,7 @@
 #include "cli.h"
 #include "ms_work.h"
 #include "que_ctl.h"
+#include "sai.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,14 +47,19 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-/* cli task */
+/* sem */
 TX_SEMAPHORE uart1_sem = {0, };
 TX_SEMAPHORE sd_que_sem = {0, };
+TX_SEMAPHORE sai1_tx_que_sem = {0, };
+/* cli task */
 TX_THREAD cli_tcb = {0, };
 ULONG cli_task_buf[1024] = {0, };
 /* ms task */
 TX_THREAD ms_tcb = {0, };
 ULONG ms_task_buf[1024] = {0, };
+/* sai task */
+TX_THREAD sai1_tcb = {0, };
+ULONG sai1_task_buf[1024] = {0, };
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -77,6 +83,17 @@ VOID ms_thread(ULONG id)
         tx_thread_sleep(1);
     }
 }
+
+VOID sai1_thread(ULONG id)
+{
+    (void) id;
+    while(1)
+    {
+        sai1_tx_proc();
+        /* no delay, just suspend thread */
+        tx_thread_relinquish();
+    }
+}
 /* USER CODE END PFP */
 
 /**
@@ -91,19 +108,27 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   /* USER CODE BEGIN App_ThreadX_MEM_POOL */
     que_init();
     uart_init();
+    sai_init();
   /* USER CODE END App_ThreadX_MEM_POOL */
 
   /* USER CODE BEGIN App_ThreadX_Init */
     if (tx_thread_create(&cli_tcb, "cli_tcb", 
         cli_thread, (ULONG)NULL, cli_task_buf, sizeof(cli_task_buf), 
-        15, 10, 100, TX_AUTO_START) != TX_SUCCESS)
+        10, 10, 10, TX_AUTO_START) != TX_SUCCESS)
     {
         printfail("create cli task");
     }
 
     if (tx_thread_create(&ms_tcb, "ms_tcb", 
         ms_thread, (ULONG)NULL, ms_task_buf, sizeof(ms_task_buf), 
-        15, 10, 100, TX_AUTO_START) != TX_SUCCESS)
+        10, 10, 10, TX_AUTO_START) != TX_SUCCESS)
+    {
+        printfail("create cli task");
+    }
+
+    if (tx_thread_create(&sai1_tcb, "sai1_tcb", 
+        sai1_thread, (ULONG)NULL, sai1_task_buf, sizeof(sai1_task_buf), 
+        10, 10, 100, TX_AUTO_START) != TX_SUCCESS)
     {
         printfail("create cli task");
     }

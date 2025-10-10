@@ -52,7 +52,7 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-
+#define FILE_ROUTE_LEN 256
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

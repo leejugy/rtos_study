@@ -101,19 +101,30 @@ typedef enum{
 }SD_REQUEST;
 typedef struct
 {
-    char route[256];
+    char route[FILE_ROUTE_LEN];
     uint8_t *buf;
-    size_t *rd_size;
+    int *rd_size;
     size_t buf_size;
     uint32_t seek;
     SD_REQUEST req;
     bool *req_end;
 }sd_req_t;
 
+typedef struct
+{
+    char route[FILE_ROUTE_LEN];
+    FX_FILE file;
+    uint8_t opt; /* @ref FX_OPEN_FOR_READ_FAST */
+}sd_handle_t;
+
 #define sd_req_end_wait(sd_req) while(!(*(((sd_req_t*) sd_req)->req_end))) \
 {                          \
     tx_thread_relinquish();\
 }
+int sd_open(sd_handle_t *sd);
+int sd_write(sd_handle_t *sd, uint32_t seek, uint8_t *buf, size_t buf_size);
+int sd_read(sd_handle_t *sd, uint32_t seek, uint8_t *buf, size_t buf_size);
+int sd_close(sd_handle_t *sd);
 /* USER CODE END PD */
 
 /* USER CODE BEGIN 1 */

@@ -21,6 +21,7 @@
 #include "main.h"
 #include "gpdma.h"
 #include "icache.h"
+#include "sai.h"
 #include "sdmmc.h"
 #include "tim.h"
 #include "usart.h"
@@ -97,6 +98,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM8_Init();
   MX_SDMMC1_SD_Init();
+  MX_SAI1_Init();
   /* USER CODE BEGIN 2 */
   tim_init();
   /* USER CODE END 2 */
@@ -134,7 +136,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_CSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_CSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSIDiv = RCC_HSI_DIV2;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.CSIState = RCC_CSI_ON;
   RCC_OscInitStruct.CSICalibrationValue = RCC_CSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;

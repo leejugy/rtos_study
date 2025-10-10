@@ -49,6 +49,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/status.c
     Core/Src/ms_work.c
     Core/Src/que_ctl.c
+    Core/Src/pcm5102a.c
 )
 
 # Add include paths

@@ -66,6 +66,81 @@ FX_MEDIA        sdio_disk;
 void fx_app_thread_entry(ULONG thread_input);
 
 /* USER CODE BEGIN PFP */
+int sd_open(sd_handle_t *sd)
+{
+    UINT sd_status = fx_file_open(&sdio_disk, &sd->file, sd->route, sd->opt);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("fail to open file : %d", sd_status);
+        return -1;
+    }
+    return 1;
+}
+
+int sd_write(sd_handle_t *sd, uint32_t seek, uint8_t *buf, size_t buf_size)
+{
+    UINT sd_status = fx_file_seek(&sd->file, seek);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file seek fail");
+        return -1;
+    }
+
+    sd_status = fx_file_write(&sd->file, buf, buf_size);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file write fail : %d", sd_status);
+        return -1;
+    }
+
+    sd_status = fx_media_flush(&sdio_disk);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status);
+        return -1;
+    }
+    return 1;
+}
+
+int sd_read(sd_handle_t *sd, uint32_t seek, uint8_t *buf, size_t buf_size)
+{
+    UINT sd_status = fx_file_seek(&sd->file, seek);
+    uint32_t len = 0;
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file seek fail");
+        return -1;
+    }
+
+    sd_status = fx_file_read(&sd->file, buf, buf_size, &len);
+    if (sd_status != FX_SUCCESS && sd_status != FX_END_OF_FILE)
+    {
+        printr("file read fail : %d", sd_status);
+        return -1;
+    }
+    return len;
+}
+
+int sd_close(sd_handle_t *sd)
+{    
+    UINT sd_status = fx_file_close(&sd->file);
+
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status);
+        return -1;
+    }
+
+    sd_status = fx_media_flush(&sdio_disk);
+    if (sd_status != FX_SUCCESS)
+    {
+        printr("file close fail : %d", sd_status);
+        return -1;
+    }
+
+    return 1;
+}
+
 static int sd_file_create(sd_req_t *sd_req)
 {
     UINT sd_status = 0;
@@ -154,7 +229,7 @@ static int sd_file_read(sd_req_t *sd_req)
         goto out;
     }
 
-    sd_status = fx_file_open(&sdio_disk, &file, sd_req->route, FX_OPEN_FOR_WRITE);
+    sd_status = fx_file_open(&sdio_disk, &file, sd_req->route, FX_OPEN_FOR_READ_FAST);
     if (sd_status != FX_SUCCESS)
     {
         printr("file open fail : %d", sd_status);
@@ -185,7 +260,7 @@ static int sd_file_read(sd_req_t *sd_req)
 
 close_out:
     sd_status = fx_file_close(&file);
-    if (sd_status != FX_SUCCESS)
+    if (sd_status != FX_SUCCESS && sd_status != FX_END_OF_FILE)
     {
         printr("file close fail : %d", sd_status);
         return -1;

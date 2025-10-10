@@ -101,7 +101,7 @@ static inline void print_dmesg(char *fmt, ...)
 #define printdepend(fmt, ...) printu("[\x1b[33;5mDEPEND\x1b[0m] "fmt"\r\n", ##__VA_ARGS__)
 
 #define printr(fmt, ...) prints("[\x1b[31;1mERR, %s\x1b[0m]"fmt"\r\n", __FUNCTION__, ##__VA_ARGS__)
-#define printg(fmt, ...) prints("[\x1b[32;1mERR, %s\x1b[0m]"fmt"\r\n", __FUNCTION__, ##__VA_ARGS__)
+#define printg(fmt, ...) prints("[\x1b[32;1mSUCC, %s\x1b[0m]"fmt"\r\n", __FUNCTION__, ##__VA_ARGS__)
 #define printd(fmt, ...) prints("[\x1b[34;1mDBG, %s\x1b[0m]"fmt"\r\n", __FUNCTION__, ##__VA_ARGS__)
 #define printy(fmt, ...) prints("[\x1b[32;1mWARN, %s\x1b[0m]"fmt"\r\n", __FUNCTION__, ##__VA_ARGS__)
 

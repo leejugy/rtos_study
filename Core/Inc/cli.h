@@ -21,6 +21,7 @@ typedef enum
     CMD_TOUCH,
     CMD_MKDIR,
     CMD_REMOVE,
+    CMD_APLAY,
     CMD_IDX_MAX,
 }CLI_COMMAND_IDX;
 
