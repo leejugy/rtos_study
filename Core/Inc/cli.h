@@ -22,6 +22,7 @@ typedef enum
     CMD_MKDIR,
     CMD_REMOVE,
     CMD_APLAY,
+    CMD_AMIXER,
     CMD_IDX_MAX,
 }CLI_COMMAND_IDX;
 

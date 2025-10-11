@@ -16,6 +16,7 @@ static CLI_EXEC_RESULT cmd_touch(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_mkdir(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_remove(cli_data_t *cli_data);
 static CLI_EXEC_RESULT cmd_aplay(cli_data_t *cli_data);
+static CLI_EXEC_RESULT cmd_amixer(cli_data_t *cli_data);
 
 cli_command_t cli_cmd[CMD_IDX_MAX] = 
 {
@@ -109,12 +110,26 @@ cli_command_t cli_cmd[CMD_IDX_MAX] =
 
     /* aplay */
     [CMD_APLAY].help = \
-    "aplay      : play wav file (44100hz, signed 16 only)\r\n" \
-    "<use>      : aplay <route>\r\n",
+    "aplay      : play control wav file (44100hz, signed 16 only)\r\n" \
+    "<play>     : aplay -l <route>\r\n"
+    "<pause>    : aplay -p\r\n"
+    "<stop>     : aplay -s\r\n" /* when stop music, can't resume music */
+    "<resume>   : aplay -r\r\n",
     [CMD_APLAY].name = "aplay",
     [CMD_APLAY].func = cmd_aplay,
-    [CMD_APLAY].opt = "",
+    [CMD_APLAY].opt = "lpsr",
     [CMD_APLAY].opt_size = 0,
+
+    /* amixer */
+    [CMD_AMIXER].help = \
+    "amixer     : volume control device\r\n" \
+    "<vol set>  : amixer -v <volume> [0 ~ 100]\r\n"
+    "<vol up>   : amixer -u\r\n"
+    "<vol down> : amixer -d\r\n",
+    [CMD_AMIXER].name = "amixer",
+    [CMD_AMIXER].func = cmd_amixer,
+    [CMD_AMIXER].opt = "vud",
+    [CMD_AMIXER].opt_size = 0,
 };
 
 /**
@@ -649,27 +664,105 @@ static CLI_EXEC_RESULT cmd_aplay(cli_data_t *cli_data)
 {
     sai_tx_req_t tx_req = {0, };
     cli_arg_t cli_arg = {0, };
+    int idx = 0;    
 
-    tx_req.flag = SAI_NEW_MUSIC;
-
-    cli_arg.cli_get.num = 0;
+    cli_arg.cli_get.opt = cli_cmd[CMD_APLAY].opt[idx++];
     cli_arg.opt.get_ret = 1;
-    if (cli_get_arg(cli_data, &cli_arg) < 0)
+    if (cli_get_opt(cli_data, &cli_arg) > 0)
     {
-        printr("arg not detect");
-        return EXEC_RESULT_ERR;
+        prints("play wav file : %s\r\n", cli_arg.arg);
+        tx_req.flag = SAI_NEW_MUSIC;    
+        strcpy(tx_req.req.route, cli_arg.arg);
+        goto push_out;
     }
 
-    strcpy(tx_req.route, cli_arg.arg);
+    cli_arg.cli_get.opt = cli_cmd[CMD_APLAY].opt[idx++];
+    cli_arg.opt.get_ret = 0;
+    if (cli_get_opt(cli_data, &cli_arg) == 0)
+    {
+        prints("pause wav file\r\n", cli_arg.arg);
+        tx_req.flag = SAI_PAUSE;    
+        goto push_out;
+    }
 
+    cli_arg.cli_get.opt = cli_cmd[CMD_APLAY].opt[idx++];
+    if (cli_get_opt(cli_data, &cli_arg) == 0)
+    {
+        prints("stop wav file\r\n", cli_arg.arg);
+        tx_req.flag = SAI_STOP;    
+        goto push_out;
+    }
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_APLAY].opt[idx++];
+    if (cli_get_opt(cli_data, &cli_arg) == 0)
+    {
+        prints("resume wav file\r\n", cli_arg.arg);
+        tx_req.flag = SAI_RESUME;    
+        goto push_out;
+    }
+
+    printr("no opt detected");
+    return EXEC_RESULT_ERR;
+
+push_out:
     if (que_push(&sai1_tx_que, &tx_req, sizeof(tx_req)) < 0)
     {
         printr("fail to push que");
         return EXEC_RESULT_ERR;
     }
-
-    prints("play wav file : %s\r\n", cli_arg.arg);
     return EXEC_RESULT_OK;
+}
+
+static CLI_EXEC_RESULT cmd_amixer(cli_data_t *cli_data)
+{
+    sai_tx_req_t tx_req = {0, };
+    cli_arg_t cli_arg = {0, };
+    int idx = 0;
+    uint8_t volume = 0;
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_AMIXER].opt[idx++];
+    cli_arg.opt.get_ret = 1;
+    if (cli_get_opt(cli_data, &cli_arg) > 0)
+    {
+        volume = atoi(cli_arg.arg);
+        prints("amixer volume : %d\r\n", volume);
+        tx_req.flag = SAI_VOL_CTL;
+        if (volume < 0 || volume > 100)
+        {
+            printr("volume range");
+            return EXEC_RESULT_ERR;
+        }
+        tx_req.req.volume = volume;
+        goto push_out;
+    }
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_AMIXER].opt[idx++];
+    cli_arg.opt.get_ret = 0;
+    if (cli_get_opt(cli_data, &cli_arg) == 0)
+    {
+        prints("up volume\r\n", cli_arg.arg);
+        tx_req.flag = SAI_UP_VOL;    
+        goto push_out;
+    }
+
+    cli_arg.cli_get.opt = cli_cmd[CMD_AMIXER].opt[idx++];
+    if (cli_get_opt(cli_data, &cli_arg) == 0)
+    {
+        prints("dwon volume\r\n", cli_arg.arg);
+        tx_req.flag = SAI_DOWN_VOL;    
+        goto push_out;
+    }
+
+    printr("no opt detected");
+    return EXEC_RESULT_ERR;
+
+push_out:
+    if (que_push(&sai1_tx_que, &tx_req, sizeof(tx_req)) < 0)
+    {
+        printr("fail to push que");
+        return EXEC_RESULT_ERR;
+    }
+    return EXEC_RESULT_OK; 
 }
 
 static CLI_EXEC_RESULT __cli_work(char *rx, cli_data_t *cli_data)

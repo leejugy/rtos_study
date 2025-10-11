@@ -58,14 +58,6 @@ void sai_init()
 
 static int sai_tx_dma_start(sai_tx_t *s_t)
 {
-    if (s_t->handle->hdmatx->State == HAL_DMA_STATE_SUSPEND)
-    {
-        if (HAL_DMAEx_Resume(s_t->handle->hdmatx) != HAL_OK)
-        {
-            return -1;
-        }
-    }
-
     if (HAL_SAI_Transmit_DMA(s_t->handle, s_t->buf, SAI_BUF_SIZE/sizeof(uint16_t)) != HAL_OK)
     {
         return -1;
@@ -86,17 +78,12 @@ static int sai_tx_dma_stop(sai_tx_t *s_t)
 
 static int sai_tx_dma_pause(sai_tx_t *s_t)
 {
-    if (HAL_DMAEx_Suspend(s_t->handle->hdmatx) != HAL_OK)
-    {
-        return -1;
-    }
-
-    return 1;
+    return sai_tx_dma_stop(s_t);
 }
 
 static int sai_tx_dma_resume(sai_tx_t *s_t)
 {
-    if (HAL_DMAEx_Resume(s_t->handle->hdmatx) != HAL_OK)
+    if (sai_tx_dma_start(s_t) != HAL_OK)
     {
         return -1;
     }
@@ -104,12 +91,15 @@ static int sai_tx_dma_resume(sai_tx_t *s_t)
     return 1;
 }
 
-static void sai_force_close(sai_tx_t *s_t)
+static void sai_force_close(sai_tx_t *s_t, bool close_sd)
 {
     s_t->flag = SAI_IDLE;
     s_t->old_flag = SAI_IDLE;
     s_t->seek_idx = 0;
-    sd_close(&s_t->sd);
+    if (close_sd)
+    {
+        sd_close(&s_t->sd);
+    }
     que_flush(s_t->q);
     memset(s_t->sd.route, 0, sizeof(s_t->sd.route));
     memset(s_t->buf, 0, sizeof(s_t->buf));
@@ -166,6 +156,11 @@ static void inline sai_tx_continue(sai_tx_t *s_t)
     int len = 0;
     static bool end_flag = false;
 
+    if (s_t->old_flag != s_t->flag)
+    {
+        s_t->old_flag = s_t->flag;
+    }
+
     switch (s_t->tx_flag)
     {
     case SAI_TX_IDLE:
@@ -175,7 +170,7 @@ static void inline sai_tx_continue(sai_tx_t *s_t)
             if (len < 0)
             {
                 printr("read fail");
-                sai_force_close(s_t);
+                sai_force_close(s_t, true);
                 return;
             }
 
@@ -202,8 +197,8 @@ static void inline sai_tx_continue(sai_tx_t *s_t)
     case SAI_TX_CPLT:
         if (end_flag)
         {
+            s_t->old_flag = s_t->flag;
             s_t->flag = SAI_WAIT_END;
-            s_t->old_flag = SAI_WAIT_END;
             s_t->end_cnt = tx_time_get();
             end_flag = false;
         }
@@ -215,34 +210,68 @@ static void inline sai_tx_continue(sai_tx_t *s_t)
 
 static void inline sai_tx_resume(sai_tx_t *s_t)
 {
-    sai_tx_dma_resume(s_t);
-    s_t->flag = SAI_CONTINUE;
-    s_t->old_flag = SAI_CONTINUE;
+    if (s_t->old_flag == SAI_CONTINUE ||
+        s_t->old_flag == SAI_NEW_MUSIC ||
+        s_t->old_flag == SAI_RESUME)
+    {
+        s_t->flag = s_t->old_flag;
+    }
+    else if (s_t->old_flag == SAI_PAUSE)
+    {
+        sai_tx_dma_resume(s_t);
+        s_t->func.mute(false);
+        s_t->old_flag = s_t->flag;
+        s_t->flag = SAI_CONTINUE;
+    }
+    else
+    {
+        s_t->old_flag = SAI_IDLE;
+        s_t->flag = SAI_IDLE;
+    }
 }
 
 static void inline sai_tx_stop(sai_tx_t *s_t)
 {
-    sai_force_close(s_t);
+    sai_force_close(s_t, true);
 }
 
 static void inline sai_tx_pause(sai_tx_t *s_t)
 {
-    sai_tx_dma_pause(s_t);
-    s_t->flag = SAI_IDLE;
-    s_t->old_flag = SAI_IDLE;
+    if (s_t->old_flag == SAI_CONTINUE ||
+        s_t->old_flag == SAI_RESUME || 
+        s_t->old_flag == SAI_NEW_MUSIC)
+    {
+        sai_tx_dma_pause(s_t);
+        s_t->func.mute(true);
+        s_t->old_flag = SAI_PAUSE;
+    }
+    else if (s_t->old_flag != SAI_PAUSE)
+    {
+        s_t->old_flag = SAI_IDLE;
+        s_t->flag = SAI_IDLE;
+    }
 }
 
 
 static void inline sai_tx_new_music(sai_tx_t *s_t)
 {
+    if (s_t->old_flag == SAI_CONTINUE || 
+        s_t->old_flag == SAI_NEW_MUSIC ||
+        s_t->old_flag == SAI_RESUME ||
+        s_t->old_flag == SAI_PAUSE)
+    {
+        s_t->flag = s_t->old_flag;
+        printr("already in progress");
+        return;
+    }
+
     s_t->seek_idx = 0;
     s_t->sd.opt = FX_OPEN_FOR_READ_FAST;
 
     if (sd_open(&s_t->sd) < 0)
     {
         printr("fail to open file");
-        s_t->flag = SAI_IDLE;
-        s_t->old_flag = SAI_IDLE;
+        sai_force_close(s_t, false);
         return;
     }
 
@@ -251,14 +280,14 @@ static void inline sai_tx_new_music(sai_tx_t *s_t)
     if (len < 0)
     {
         printr("fail to read file");
-        sai_force_close(s_t);
+        sai_force_close(s_t, true);
         return;
     }
 
     if (wav_header_parse(s_t, s_t->pre_buf, len) < 0)
     {
         printr("fail to parse wav");
-        sai_force_close(s_t);
+        sai_force_close(s_t, true);
         return;
     }
 
@@ -266,7 +295,7 @@ static void inline sai_tx_new_music(sai_tx_t *s_t)
     if (len < 0)
     {
         printr("read fail");
-        sai_force_close(s_t);
+        sai_force_close(s_t, true);
         return;
     }
 
@@ -275,9 +304,9 @@ static void inline sai_tx_new_music(sai_tx_t *s_t)
         s_t->func.conv_s16_vol((int16_t *)s_t->pre_buf, len);
     }
     s_t->func.mute(false);
+    s_t->old_flag = s_t->flag;
     s_t->flag = SAI_CONTINUE;
     s_t->seek_idx += len;
-    s_t->old_flag = SAI_CONTINUE;
 
     while (!que_full(s_t->q))
     {
@@ -285,7 +314,7 @@ static void inline sai_tx_new_music(sai_tx_t *s_t)
         if (len < 0)
         {
             printr("read fail");
-            sai_force_close(s_t);
+            sai_force_close(s_t, true);
             return;
         }
 
@@ -317,6 +346,10 @@ static void inline sai_tx_up_vol(sai_tx_t *s_t)
     {
         s_t->volume++;
     }
+    else
+    {
+        printr("vol max");
+    }
     s_t->func.vol_ctl(s_t->volume);
     s_t->flag = s_t->old_flag;
 }
@@ -327,7 +360,25 @@ static void inline sai_tx_down_vol(sai_tx_t *s_t)
     {
         s_t->volume--;   
     }
+    else
+    {
+        printr("vol min");
+    }
     s_t->func.vol_ctl(s_t->volume);
+    s_t->flag = s_t->old_flag;
+}
+
+static void inline sai_tx_vol_ctl(sai_tx_t *s_t)
+{
+    if (s_t->volume >= 0 &&
+        s_t->volume <= 100)
+    {
+        s_t->func.vol_ctl(s_t->volume);    
+    }
+    else
+    {
+        printr("invalid volume");
+    }
     s_t->flag = s_t->old_flag;
 }
 
@@ -335,7 +386,7 @@ static void inline sai_tx_wait_end(sai_tx_t *s_t)
 {
     if (check_expired(s_t->end_cnt, 1000))
     {
-        sai_force_close(s_t);
+        sai_force_close(s_t, true);
         printg("end sai");
     }
 }
@@ -370,6 +421,9 @@ static void __sai_tx_proc(sai_tx_t *s_t)
     case SAI_DOWN_VOL:
         sai_tx_down_vol(s_t);
         break;
+    case SAI_VOL_CTL:
+        sai_tx_vol_ctl(s_t);
+        break;
     case SAI_WAIT_END:
         sai_tx_wait_end(s_t);
         break;
@@ -389,8 +443,19 @@ static void sai_tx_req_proc(sai_tx_req_t *tx_req, sai_tx_t *s_t)
     case SAI_UP_VOL:
     case SAI_DOWN_VOL:
         break;
+    case SAI_VOL_CTL:
+        if (tx_req->req.volume >= 0 && 
+            tx_req->req.volume <= 100)
+        {
+            s_t->volume = tx_req->req.volume;
+        }
+        else
+        {
+            printr("invalid volume");
+        }
+        break;
     case SAI_NEW_MUSIC:
-        strcpy(s_t->sd.route, tx_req->route);
+        strcpy(s_t->sd.route, tx_req->req.route);
         break;
     }
 

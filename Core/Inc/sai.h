@@ -65,6 +65,7 @@ typedef enum
     SAI_MUTE,
     SAI_UP_VOL,
     SAI_DOWN_VOL,
+    SAI_VOL_CTL,
     SAI_WAIT_END,
 }SAI_CTL;
 /* USER CODE END Private defines */
@@ -118,10 +119,16 @@ typedef struct
     sai_func_t func;
 }sai_tx_t;
 
+typedef union
+{
+    char route[FILE_ROUTE_LEN];
+    uint8_t volume;
+}sai_tx_req_u;
+
 typedef struct
 {
     uint8_t flag; /* @ref SAI_CTL */
-    char route[FILE_ROUTE_LEN];
+    sai_tx_req_u req;
 }sai_tx_req_t;
 
 extern sai_tx_t sai_tx[SAI_TX_IDX_MAX];
