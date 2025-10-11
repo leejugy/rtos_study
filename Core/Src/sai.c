@@ -258,7 +258,8 @@ static void inline sai_tx_new_music(sai_tx_t *s_t)
     if (s_t->old_flag == SAI_CONTINUE || 
         s_t->old_flag == SAI_NEW_MUSIC ||
         s_t->old_flag == SAI_RESUME ||
-        s_t->old_flag == SAI_PAUSE)
+        s_t->old_flag == SAI_PAUSE ||
+        s_t->old_flag == SAI_WAIT_END)
     {
         s_t->flag = s_t->old_flag;
         printr("already in progress");

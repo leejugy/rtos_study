@@ -516,3 +516,5 @@
 33	400	7818657862539971	CMakeFiles/h562_rtos_study.dir/Core/Src/sai.c.obj	7b093ebe0a2d9a5f
 40	419	7818657862706052	CMakeFiles/h562_rtos_study.dir/Core/Src/cli.c.obj	780165b55edcefcb
 419	1404	7818657872247263	h562_rtos_study.elf	b1c65e1159962ce0
+33	415	7818674342373929	CMakeFiles/h562_rtos_study.dir/Core/Src/sai.c.obj	7b093ebe0a2d9a5f
+415	1462	7818674352593369	h562_rtos_study.elf	b1c65e1159962ce0
